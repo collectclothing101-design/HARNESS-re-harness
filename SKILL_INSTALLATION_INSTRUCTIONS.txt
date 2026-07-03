@@ -1,0 +1,62 @@
+================================================================================
+HARNESS INSTALLATION SKILL v1.0.0 — Installation Instructions
+================================================================================
+
+LOCATION: /mnt/user-data/outputs/harness-installation-skill-v1.0.0
+
+TO INSTALL THIS SKILL:
+
+1. Copy the skill directory to your Claude skills folder:
+
+   On macOS:
+   cp -r harness-installation-skill-v1.0.0 \
+     ~/Library/Application\ Support/Claude/skills/harness-installation
+
+2. Restart Claude Desktop:
+   killall Claude && open /Applications/Claude.app
+
+3. The skill will auto-load when Claude detects Harness-related queries.
+
+SKILL CONTENTS:
+
+├── SKILL.md                          — Main skill definition & content
+├── README.md                         — Quick reference
+├── scripts/                          — Installation & diagnostic tools
+│   ├── QUICK_FIX_INSTALL_NOW.sh
+│   ├── VENV_SETUP_RECOMMENDED.sh
+│   ├── SYSTEM_DIAGNOSTICS.sh
+│   ├── VALIDATE_AND_FIX_CLAUDE_CONFIG.sh
+│   ├── MCP_PERFORMANCE_VALIDATOR.sh
+│   ├── HARNESS_ENVIRONMENT_MIGRATION.sh
+│   ├── HARNESS_UNINSTALL_AND_CLEANUP.sh
+│   └── verify_harness_installation.sh
+└── references/                       — Documentation
+    ├── ADVANCED_TROUBLESHOOTING.md
+    └── claude_desktop_config.template.json
+
+TRIGGERING THE SKILL:
+
+The skill triggers when you mention:
+- Harness installation
+- MCP server setup
+- PEP 668 errors
+- Claude Desktop configuration
+- Python environment problems
+- Diagnostics, validation, performance testing for Harness
+
+Example queries that trigger this skill:
+- "Help me install Harness"
+- "I'm getting a PEP 668 error"
+- "Can you fix my Harness configuration?"
+- "Validate my Harness installation"
+- "Performance test Harness MCP"
+
+ACCESSING SKILL TOOLS:
+
+Once installed, Claude can execute any of the scripts in the skills/harness-installation/scripts/ directory.
+You can also manually run them from the terminal:
+
+   bash ~/Library/Application\ Support/Claude/skills/harness-installation/scripts/SYSTEM_DIAGNOSTICS.sh
+
+SKILL VERSION: v1.0.0
+Created for Harness v3.0.0 on macOS (Universal)

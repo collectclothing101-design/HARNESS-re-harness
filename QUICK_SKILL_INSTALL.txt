@@ -1,0 +1,19 @@
+QUICK INSTALL: Harness Installation Skill v1.0.0
+
+Run from /mnt/user-data/outputs/:
+
+  bash INSTALL_SKILL_NOW.sh
+
+This will:
+1. Copy the skill to ~/Library/Application Support/Claude/skills/harness-installation
+2. Set proper permissions on all scripts
+3. Print next steps
+
+After running, restart Claude:
+  killall Claude && open /Applications/Claude.app
+
+Then trigger the skill with any Harness query:
+  "Help me install Harness"
+  "I'm getting a PEP 668 error"
+  "Validate my Harness setup"
+
