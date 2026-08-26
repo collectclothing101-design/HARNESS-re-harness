@@ -21,6 +21,18 @@ test('manifest accepts immutable upstream SHA and rejects branches', () => {
   assert.throws(() => validateManifest({ ...manifest, upstream: { ...manifest.upstream, commit: 'main' } }), /40-character/);
 });
 
+test('manifest rejects duplicate identifiers and dangling workflow graph references', () => {
+  const duplicate = structuredClone(manifest);
+  duplicate.agents.push(structuredClone(duplicate.agents[0]));
+  assert.throws(() => validateManifest(duplicate), /duplicate agent/);
+  const dangling = structuredClone(manifest);
+  dangling.workflows[0].edges.push({ from: 'build', to: 'missing' });
+  assert.throws(() => validateManifest(dangling), /unknown edge node/);
+  const gate = structuredClone(manifest);
+  gate.workflows[0].reviewGates.push('missing');
+  assert.throws(() => validateManifest(gate), /unknown review gate/);
+});
+
 test('compiler emits native assets and explicit downgrades', () => {
   const codex = compileRuntime(manifest, 'codex');
   assert.equal(codex.runtime, 'codex');

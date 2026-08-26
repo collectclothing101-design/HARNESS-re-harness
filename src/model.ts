@@ -26,8 +26,21 @@ export const ManifestSchema = z.object({
 }).superRefine((value, ctx) => {
   const agents = new Set(value.agents.map(x => x.id));
   const skills = new Set(value.skills.map(x => x.id));
+  const duplicate = (items: Array<{ id: string }>, kind: string, path: string) => {
+    const seen = new Set<string>();
+    for (const item of items) if (seen.has(item.id)) ctx.addIssue({ code: 'custom', path: [path], message: `duplicate ${kind}: ${item.id}` }); else seen.add(item.id);
+  };
+  duplicate(value.agents, 'agent', 'agents');
+  duplicate(value.skills, 'skill', 'skills');
+  duplicate(value.workflows, 'workflow', 'workflows');
   for (const item of value.agents) for (const id of item.skills) if (!skills.has(id)) ctx.addIssue({ code: 'custom', path: ['agents', item.id, 'skills'], message: `unknown skill: ${id}` });
-  for (const flow of value.workflows) for (const item of flow.nodes) if (!agents.has(item.agent)) ctx.addIssue({ code: 'custom', path: ['workflows', flow.id], message: `unknown agent: ${item.agent}` });
+  for (const flow of value.workflows) {
+    duplicate(flow.nodes, 'workflow node', 'workflows');
+    const nodes = new Set(flow.nodes.map(item => item.id));
+    for (const item of flow.nodes) if (!agents.has(item.agent)) ctx.addIssue({ code: 'custom', path: ['workflows', flow.id], message: `unknown agent: ${item.agent}` });
+    for (const item of flow.edges) for (const id of [item.from, item.to]) if (!nodes.has(id)) ctx.addIssue({ code: 'custom', path: ['workflows', flow.id, 'edges'], message: `unknown edge node: ${id}` });
+    for (const id of flow.reviewGates) if (!nodes.has(id)) ctx.addIssue({ code: 'custom', path: ['workflows', flow.id, 'reviewGates'], message: `unknown review gate: ${id}` });
+  }
 });
 
 export type HarnessManifest = z.infer<typeof ManifestSchema>;

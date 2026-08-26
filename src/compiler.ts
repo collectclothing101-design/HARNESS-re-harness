@@ -70,7 +70,7 @@ export function compileRuntime(input: HarnessManifest, runtime: Runtime): Compil
     })),
     ...manifest.skills.map(skill => ({
       path: `${root}/skills/${skill.id}/SKILL.md`,
-      content: `---\nname: ${skill.id}\ndescription: ${skill.description}\ntriggers: ${JSON.stringify(skill.triggers)}\n---\n\n# ${skill.id}\n\n${skill.description}\n`
+      content: `---\nname: ${skill.id}\ndescription: ${JSON.stringify(skill.description)}\ntriggers: ${JSON.stringify(skill.triggers)}\n---\n\n# ${skill.id}\n\n${skill.description}\n`
     })),
     ...manifest.workflows.map(flow => ({ path: `${root}/workflows/${flow.id}.json`, content: `${JSON.stringify(flow, null, 2)}\n` }))
   ];
