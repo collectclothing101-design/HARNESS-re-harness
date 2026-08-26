@@ -1,0 +1,15 @@
+{
+  "name": "harness-re-harness",
+  "packageVersion": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "irVersion": "1.0.0",
+  "adapterVersion": "1.0.0",
+  "migrationVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/revfactory/harness",
+    "commit": "cceac68ea1d0ad198ef4b7b906cd238375836387",
+    "policy": "The 1.0.x compatibility line is pinned to this reviewed immutable v1 commit. Upstream v2 remains experimental until merged and reviewed."
+  },
+  "mcpSdk": "1.30.0",
+  "supportedRuntimes": ["claude", "codex", "chatgpt", "mimo", "opencode", "hermes", "frank", "generic"]
+}

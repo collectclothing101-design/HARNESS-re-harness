@@ -1,10 +1,6 @@
-__pycache__/
-*.pyc
-*.pyo
-test_e2e/
-test_harness_data/
-test_skill_output/
-test_wix_output/
-.env
-.env.*
-*.log
+node_modules/
+dist/
+*.tgz
+generated/
+*.hrh-backup
+*.hrh-*.tmp

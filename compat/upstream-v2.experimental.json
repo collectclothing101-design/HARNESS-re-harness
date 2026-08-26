@@ -1,0 +1,20 @@
+{
+  "status": "experimental-not-production-pinned",
+  "sourcePullRequest": "https://github.com/revfactory/harness/pull/56",
+  "adoptionPolicy": "Adopt only after equivalent changes merge to upstream main, receive a reviewed immutable commit SHA, and pass this distribution's acceptance suite.",
+  "executionModes": [
+    "workflow-orchestration",
+    "persistent-collaboration",
+    "subagent-delegation"
+  ],
+  "removedAssumptions": [
+    "TeamCreate",
+    "TeamDelete",
+    "team_name",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"
+  ],
+  "modelPolicy": {
+    "canonical": ["reasoning", "balanced", "fast"],
+    "claudeAdapter": { "reasoning": "opus", "balanced": "sonnet", "fast": "sonnet" }
+  }
+}
