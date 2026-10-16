@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0", "packageVersion": "1.0.0", "name": "software-team",
+  "schemaVersion": "1.0.0", "packageVersion": "1.1.0", "name": "software-team",
   "upstream": { "repository": "https://github.com/revfactory/harness", "commit": "cceac68ea1d0ad198ef4b7b906cd238375836387" },
   "agents": [
     { "id": "builder", "role": "implementation", "modelTier": "balanced", "skills": ["implementation"], "tools": ["filesystem","tests"] },
@@ -12,3 +12,4 @@
   "workflows": [{ "id": "delivery", "pattern": "producer-reviewer", "nodes": [{ "id": "build", "agent": "builder" }, { "id": "review", "agent": "reviewer" }], "edges": [{ "from": "build", "to": "review" }], "reviewGates": ["review"] }],
   "runtimeRequirements": ["agents","skills","tools","mcp","workflows","review-gates","artifacts"]
 }
+
