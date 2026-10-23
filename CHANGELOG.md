@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0 — 2026-10-23
+
+- Write a complete install transaction journal before configuration mutation.
+- Add an idempotent `recover` command for interrupted project-scoped installs.
+- Exercise hard kills in separate child processes after backup, configuration replacement, asset creation, and receipt creation.
+- Restore byte-identical original configuration and remove only hash-owned generated assets during recovery.
+- Preserve post-crash user edits and retain the journal and backup for manual resolution.
+- Reject post-crash symlink swaps before recovery mutates any path.
+
 ## 1.1.0 — 2026-10-16
 
 - Emit absolute, working MCP launch descriptors for all eight runtime adapters.

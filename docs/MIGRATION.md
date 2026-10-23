@@ -1,5 +1,11 @@
 # Migration from Python compatibility patches
 
+## Upgrade from 1.1.0 to 1.2.0
+
+The canonical schema, IR, adapter contract, migration number, and receipt schema remain unchanged. Update the manifest's `packageVersion` to `1.2.0`, then validate it and run the acceptance suite.
+
+Version 1.2.0 adds install journal schema 1 at `.harness-re-harness/transaction.json`. If that file remains after an interrupted install, run `node dist/cli.js recover --project <root>` before retrying. Recovery is idempotent. When it detects post-crash edits, it exits nonzero and intentionally retains the journal and `.hrh-backup`; review those files rather than deleting them automatically.
+
 ## Upgrade from 1.0.0 to 1.1.0
 
 The canonical schema, IR, adapter contract, and migration number remain at `1.0.0`, `1.0.0`, `1.0.0`, and `1`. Update the manifest's `packageVersion` to `1.1.0`, then validate it and run the acceptance suite.

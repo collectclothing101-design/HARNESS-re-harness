@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion","packageVersion","name","upstream","agents","skills","workflows","runtimeRequirements"],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" }, "packageVersion": { "const": "1.1.0" },
+    "schemaVersion": { "const": "1.0.0" }, "packageVersion": { "const": "1.2.0" },
     "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
     "upstream": { "type": "object", "additionalProperties": false, "required": ["repository","commit"], "properties": { "repository": { "type": "string", "format": "uri" }, "commit": { "type": "string", "pattern": "^[a-fA-F0-9]{40}$" } } },
     "agents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/agent" } },

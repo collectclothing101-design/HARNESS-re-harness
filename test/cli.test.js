@@ -12,7 +12,7 @@ import { parse as parseToml } from 'smol-toml';
 import { parse as parseYaml } from 'yaml';
 
 const valid = {
-  schemaVersion: '1.0.0', packageVersion: '1.1.0', name: 'cli-demo',
+  schemaVersion: '1.0.0', packageVersion: '1.2.0', name: 'cli-demo',
   upstream: { repository: 'https://github.com/revfactory/harness', commit: '0123456789abcdef0123456789abcdef01234567' },
   agents: [{ id: 'builder', role: 'implementation', modelTier: 'balanced', skills: ['coding'], tools: ['filesystem'] }],
   skills: [{ id: 'coding', description: 'Implement code', triggers: ['implement'] }],
@@ -22,6 +22,14 @@ const valid = {
 
 function cli(args, cwd) {
   return spawnSync(process.execPath, [join(process.cwd(), 'dist/cli.js'), ...args], { cwd, encoding: 'utf8' });
+}
+
+function crashingCli(args, cwd, crashAt) {
+  return spawnSync(process.execPath, [join(process.cwd(), 'dist/cli.js'), ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, NODE_ENV: 'test', HARNESS_RE_HARNESS_TEST_CRASH_AT: crashAt }
+  });
 }
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
@@ -173,6 +181,74 @@ test('receipt hashes protect externally modified generated assets during verify 
   await assert.rejects(access(`${config}.hrh-backup`));
   await assert.rejects(access(receiptFile));
   assert.deepEqual(JSON.parse(uninstalled.stdout).preserved, [modified.path]);
+});
+
+test('recover rolls back hard-killed installs at each durable boundary and is idempotent', async () => {
+  for (const crashAt of ['after-backup', 'after-config', 'after-asset', 'during-receipt']) {
+    const dir = await mkdtemp(join(tmpdir(), `hrh-crash-${crashAt}-`));
+    const input = join(dir, 'harness.manifest.json');
+    const config = join(dir, '.codex/config.toml');
+    await mkdir(join(dir, '.codex'), { recursive: true });
+    await writeFile(input, JSON.stringify(valid));
+    await writeFile(config, 'theme = "dark"\n');
+
+    const interrupted = crashingCli(['install', input, '--runtime', 'codex', '--project', dir, '--config', config], dir, crashAt);
+    assert.equal(interrupted.signal, 'SIGKILL', `${crashAt}: ${interrupted.stderr}`);
+    assert.equal(await access(join(dir, '.harness-re-harness/transaction.json')).then(() => true, () => false), true, crashAt);
+
+    const recovered = cli(['recover', '--project', dir], dir);
+    assert.equal(recovered.status, 0, `${crashAt}: ${recovered.stderr}`);
+    assert.equal(await readFile(config, 'utf8'), 'theme = "dark"\n', crashAt);
+    await assert.rejects(access(`${config}.hrh-backup`));
+    await assert.rejects(access(join(dir, '.harness-re-harness/install.json')));
+    await assert.rejects(access(join(dir, '.harness-re-harness/transaction.json')));
+    await assert.rejects(access(join(dir, '.codex/agents/builder.md')));
+
+    const repeated = cli(['recover', '--project', dir], dir);
+    assert.equal(repeated.status, 0, repeated.stderr);
+    assert.deepEqual(JSON.parse(repeated.stdout), { recovered: false, reason: 'no pending transaction' });
+  }
+});
+
+test('recover preserves post-crash user edits and retains evidence for manual resolution', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hrh-crash-modified-'));
+  const input = join(dir, 'harness.manifest.json');
+  const config = join(dir, '.codex/config.toml');
+  await mkdir(join(dir, '.codex'), { recursive: true });
+  await writeFile(input, JSON.stringify(valid));
+  await writeFile(config, 'theme = "dark"\n');
+
+  const interrupted = crashingCli(['install', input, '--runtime', 'codex', '--project', dir, '--config', config], dir, 'after-config');
+  assert.equal(interrupted.signal, 'SIGKILL');
+  await writeFile(config, 'user changed this after the crash\n');
+
+  const recovered = cli(['recover', '--project', dir], dir);
+  assert.notEqual(recovered.status, 0);
+  assert.match(recovered.stderr, /preserved externally modified files/i);
+  assert.equal(await readFile(config, 'utf8'), 'user changed this after the crash\n');
+  assert.equal(await access(`${config}.hrh-backup`).then(() => true, () => false), true);
+  assert.equal(await access(join(dir, '.harness-re-harness/transaction.json')).then(() => true, () => false), true);
+});
+
+test('recover refuses a post-crash symlink swap without touching the outside target', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hrh-crash-symlink-'));
+  const outside = await mkdtemp(join(tmpdir(), 'hrh-crash-outside-'));
+  const input = join(dir, 'harness.manifest.json');
+  const config = join(dir, '.codex/config.toml');
+  await mkdir(join(dir, '.codex'), { recursive: true });
+  await writeFile(input, JSON.stringify(valid));
+  await writeFile(config, 'theme = "dark"\n');
+
+  const interrupted = crashingCli(['install', input, '--runtime', 'codex', '--project', dir, '--config', config], dir, 'after-config');
+  assert.equal(interrupted.signal, 'SIGKILL');
+  await symlink(outside, join(dir, '.codex/agents'), 'dir');
+
+  const recovered = cli(['recover', '--project', dir], dir);
+  assert.notEqual(recovered.status, 0);
+  assert.match(recovered.stderr, /escapes installation root/i);
+  await assert.rejects(access(join(outside, 'builder.md')));
+  assert.match(await readFile(config, 'utf8'), /mcp_servers/);
+  assert.equal(await access(join(dir, '.harness-re-harness/transaction.json')).then(() => true, () => false), true);
 });
 
 test('doctor returns machine-readable checks', async () => {

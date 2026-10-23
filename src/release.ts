@@ -22,3 +22,4 @@ export async function validateVersionAuthority(root: string): Promise<VersionAut
   if (pkg.dependencies?.['@modelcontextprotocol/sdk'] !== distribution.mcpSdk) mismatches.push('MCP SDK pin');
   return { ok: mismatches.length === 0, expected: VERSION, mismatches };
 }
+

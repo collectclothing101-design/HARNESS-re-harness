@@ -56,10 +56,11 @@ Install into a project-scoped runtime config, verify it, and retain a rollback p
 node dist/cli.js install harness.manifest.json --runtime codex --project . --config .codex/config.toml
 node dist/cli.js verify --project .
 node dist/cli.js rollback --project .
+node dist/cli.js recover --project .
 node dist/cli.js uninstall --project .
 ```
 
-The receipt is `.harness-re-harness/install.json`. Receipt schema 2 records a SHA-256 ownership hash for every generated asset. Installation refuses an existing receipt, any generated-file collision, stale configuration backups, path escapes through symlinks, and `--replace`. Uninstall removes only generated files whose current hashes still match the receipt and reports modified files as preserved. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
+The receipt is `.harness-re-harness/install.json`. Receipt schema 2 records a SHA-256 ownership hash for every generated asset. Before any configuration mutation, installation writes `.harness-re-harness/transaction.json`; after a process or host interruption, `recover` restores the original configuration and removes only hash-owned assets. If a file changed after the interruption, recovery preserves it and retains the journal and backup for manual resolution. Installation refuses an existing receipt or journal, any generated-file collision, stale configuration backups, path escapes through symlinks, and `--replace`. Uninstall removes only generated files whose current hashes still match the receipt and reports modified files as preserved. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
 
 Installed MCP descriptors contain the host's absolute Node executable and package entry path. Regenerate them on each destination host; do not copy an installed descriptor between machines.
 
@@ -110,7 +111,7 @@ The canonical IR supports `workflow-orchestration`, `persistent-collaboration`, 
 
 ## Version and upstream policy
 
-- Package: `1.1.0`
+- Package: `1.2.0`
 - Canonical schema: `1.0.0`
 - IR: `1.0.0`
 - Adapter contract: `1.0.0`
@@ -129,6 +130,7 @@ The production distribution is pinned to `cceac68ea1d0ad198ef4b7b906cd2383758363
 - JSON/JSONC/TOML/YAML transactional merge tests;
 - backup, rollback, idempotency, and failed-write preservation tests;
 - zero-mutation collision/reinstall rejection, symlink-escape rejection, receipt ownership hashes, and modified-asset preservation;
+- separate-process hard-kill recovery after backup, config replacement, asset creation, and receipt creation;
 - exact installed-command startup for all eight adapter formats from an unrelated working directory;
 - MCP initialization and capability discovery;
 - successful and structured-error tool calls;

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { access, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 import { compileRuntime, runtimeConfig } from './compiler.js';
-import { TransactionalConfig } from './config.js';
+import { renderMergedConfig, TransactionalConfig } from './config.js';
 import { validateManifest, type Runtime } from './model.js';
 import { validateVersionAuthority } from './release.js';
 import { VERSION } from './version.js';
@@ -18,7 +18,9 @@ async function load(path: string) { return validateManifest(JSON.parse(await rea
 async function emit(path: string, content: string, exclusive = false): Promise<void> { await mkdir(dirname(path), { recursive: true }); await writeFile(path, content, { flag: exclusive ? 'wx' : 'w' }); }
 type GeneratedReceipt = { path: string; sha256: string };
 type Receipt = { receiptVersion?: number; version: string; runtime: Runtime; root: string; config: string; configExisted?: boolean; backup: string; generated: Array<string | GeneratedReceipt>; installedAt: string };
+type InstallJournal = { journalVersion: 1; version: string; runtime: Runtime; root: string; config: string; configExisted: boolean; originalConfigSha256: string; installedConfigSha256: string; backup: string; generated: GeneratedReceipt[]; startedAt: string };
 const receiptPath = (root: string) => join(root, '.harness-re-harness/install.json');
+const journalPath = (root: string) => join(root, '.harness-re-harness/transaction.json');
 async function receipt(root: string): Promise<Receipt> { return JSON.parse(await readFile(receiptPath(root), 'utf8')) as Receipt; }
 function within(root: string, path: string): boolean { const value = relative(resolve(root), resolve(path)); return value !== '' && value !== '..' && !value.startsWith(`..${sep}`) && !isAbsolute(value); }
 async function exists(path: string): Promise<boolean> { return access(path).then(() => true).catch(() => false); }
@@ -40,12 +42,49 @@ function generatedRecords(record: Receipt): Array<{ path: string; sha256?: strin
   return record.generated.map(value => typeof value === 'string' ? { path: value } : value);
 }
 async function currentHash(path: string): Promise<string | undefined> { return readFile(path).then(value => sha256(value)).catch(() => undefined); }
+function crashAt(boundary: string): void {
+  if (process.env.NODE_ENV === 'test' && process.env.HARNESS_RE_HARNESS_TEST_CRASH_AT === boundary) process.kill(process.pid, 'SIGKILL');
+}
+async function recoverPending(root: string): Promise<{ recovered: boolean; removed?: number; preserved?: string[]; reason?: string }> {
+  if (!await exists(journalPath(root))) return { recovered: false, reason: 'no pending transaction' };
+  const record = JSON.parse(await readFile(journalPath(root), 'utf8')) as InstallJournal;
+  if (record.journalVersion !== 1 || resolve(record.root) !== root) fail('pending transaction journal does not match this installation root');
+  if (!within(root, record.config) || record.generated.some(file => !within(root, file.path))) fail('pending transaction journal contains a path outside the installation root');
+  await assertContained(root, record.config);
+  for (const file of record.generated) await assertContained(root, file.path);
+
+  const preserved: string[] = [];
+  const configHash = await currentHash(record.config);
+  if (record.configExisted) {
+    if (configHash === undefined || configHash === record.installedConfigSha256) await copyFile(record.backup, record.config);
+    else if (configHash !== record.originalConfigSha256) preserved.push(record.config);
+  } else if (configHash === record.originalConfigSha256 || configHash === record.installedConfigSha256) {
+    await rm(record.config, { force: true });
+  } else if (configHash !== undefined) preserved.push(record.config);
+
+  let removed = 0;
+  for (const file of record.generated) {
+    const hash = await currentHash(file.path);
+    if (hash === file.sha256) { await rm(file.path, { force: true }); removed += 1; }
+    else if (hash !== undefined) preserved.push(file.path);
+  }
+  if (preserved.length > 0) fail(`recovery preserved externally modified files; resolve them before retrying: ${preserved.join(', ')}`);
+
+  if (await exists(receiptPath(root))) {
+    const installed = await receipt(root).catch(() => undefined);
+    if (!installed || installed.root !== record.root || installed.config !== record.config || installed.runtime !== record.runtime) fail('recovery preserved an unrecognized installation receipt');
+    await rm(receiptPath(root), { force: true });
+  }
+  await rm(record.backup, { force: true });
+  await rm(journalPath(root), { force: true });
+  return { recovered: true, removed, preserved };
+}
 
 async function main(args: string[]): Promise<void> {
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const command = args[0];
   if (!command || command === 'help' || args.includes('--help')) {
-    process.stdout.write('harness-re-harness <validate|compile|install|verify|rollback|uninstall|doctor|version|version-check|serve> [options]\n'); return;
+    process.stdout.write('harness-re-harness <validate|compile|install|recover|verify|rollback|uninstall|doctor|version|version-check|serve> [options]\n'); return;
   }
   if (command === 'version') { process.stdout.write(`${VERSION.package}\n`); return; }
   if (command === 'serve') { const { runStdioServer } = await import('./server.js'); await runStdioServer(); return; }
@@ -78,6 +117,7 @@ async function main(args: string[]): Promise<void> {
     if (!within(root, config)) fail('configuration path must remain inside the installation root');
     await assertContained(root, config);
     if (await exists(receiptPath(root))) fail('installation receipt already exists; uninstall before reinstalling');
+    if (await exists(journalPath(root))) fail('pending installation transaction exists; run recover before installing');
     if (await exists(`${config}.hrh-backup`)) fail('stale configuration backup exists; resolve it before installing');
     const compilation = compileRuntime(await load(args[1]), runtime);
     const targets = compilation.files
@@ -92,26 +132,49 @@ async function main(args: string[]): Promise<void> {
       if (await exists(target)) fail(`generated asset collision: ${target}`);
     }
     const configExisted = await exists(config);
-    if (!configExisted) await emit(config, descriptor.format === 'json' || descriptor.format === 'jsonc' || descriptor.format === 'yaml' ? '{}\n' : '');
+    const configSeed = configExisted ? await readFile(config, 'utf8') : descriptor.format === 'json' || descriptor.format === 'jsonc' || descriptor.format === 'yaml' ? '{}\n' : '';
+    const installedConfig = renderMergedConfig(configSeed, descriptor.format, descriptor.patch);
+    const planned = targets.map(({ file, target }) => ({ path: target, sha256: sha256(file.content) }));
+    const journal: InstallJournal = {
+      journalVersion: 1,
+      version: VERSION.package,
+      runtime,
+      root,
+      config,
+      configExisted,
+      originalConfigSha256: sha256(configSeed),
+      installedConfigSha256: sha256(installedConfig),
+      backup: `${config}.hrh-backup`,
+      generated: planned,
+      startedAt: new Date().toISOString()
+    };
+    await emit(journalPath(root), `${JSON.stringify(journal, null, 2)}\n`, true);
+    crashAt('after-journal');
+    if (!configExisted) await emit(config, configSeed);
     const tx = new TransactionalConfig();
     let merged: { changed: boolean; backup: string } | undefined;
     const generated: GeneratedReceipt[] = [];
     try {
-      merged = await tx.merge(config, descriptor.format, descriptor.patch);
+      merged = await tx.merge(config, descriptor.format, descriptor.patch, () => crashAt('after-backup'));
+      crashAt('after-config');
       for (const { file, target } of targets) {
         await emit(target, file.content, true);
         generated.push({ path: target, sha256: sha256(file.content) });
+        crashAt('after-asset');
       }
       const record: Receipt = { receiptVersion: 2, version: VERSION.package, runtime, root, config, configExisted, backup: merged.backup, generated, installedAt: new Date().toISOString() };
       await emit(receiptPath(root), `${JSON.stringify(record, null, 2)}\n`, true);
+      crashAt('during-receipt');
+      await rm(journalPath(root), { force: true });
     } catch (error) {
-      if (merged) await tx.rollback(config).catch(() => undefined);
-      for (const file of generated) if (within(root, file.path) && await currentHash(file.path) === file.sha256) await rm(file.path, { force: true });
-      await rm(`${config}.hrh-backup`, { force: true });
-      if (!configExisted) await rm(config, { force: true });
+      await recoverPending(root).catch(() => undefined);
       throw error;
     }
     process.stdout.write(`${JSON.stringify({ installed: true, scope: global ? 'global' : 'project', receipt: receiptPath(root), config, generated: generated.length })}\n`); return;
+  }
+  if (command === 'recover') {
+    const root = resolve(option(args, '--project') ?? '.');
+    process.stdout.write(`${JSON.stringify(await recoverPending(root))}\n`); return;
   }
   if (command === 'verify') {
     const root = resolve(option(args, '--project') ?? '.');

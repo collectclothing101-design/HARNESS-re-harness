@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { WorkflowRunner } from '../dist/index.js';
 
 const manifest = {
-  schemaVersion: '1.0.0', packageVersion: '1.1.0', name: 'runner-demo',
+  schemaVersion: '1.0.0', packageVersion: '1.2.0', name: 'runner-demo',
   upstream: { repository: 'https://github.com/revfactory/harness', commit: 'cceac68ea1d0ad198ef4b7b906cd238375836387' },
   agents: [{ id: 'builder', role: 'implementation', modelTier: 'balanced', skills: [], tools: [] }],
   skills: [],

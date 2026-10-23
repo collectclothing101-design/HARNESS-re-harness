@@ -31,3 +31,4 @@ export function createHarnessServer(): McpServer {
 export async function runStdioServer(): Promise<void> {
   await createHarnessServer().connect(new StdioServerTransport());
 }
+

@@ -13,3 +13,4 @@ Configuration mutation is deliberately separate from compilation. The CLI instal
 - Config file: sensitive user data; never copied into logs or generated reports.
 - MCP stdio: protocol-only stdout; errors are returned as MCP results.
 - Upstream repository: untrusted/mutable until a reviewed commit SHA is recorded.
+
