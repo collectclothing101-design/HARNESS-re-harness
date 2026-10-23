@@ -2,7 +2,7 @@
 
 A pinned, runtime-neutral compatibility distribution for `revfactory/harness`. It represents agents, skills, workflows, review gates, model tiers, tools, and artifacts in one canonical manifest, then generates explicit runtime assets for Claude, Codex, ChatGPT, MiMo, OpenCode, Hermes, F.R.A.N.K., and generic MCP clients.
 
-This package does not track an upstream branch at runtime. The 1.0.x line is pinned to reviewed upstream commit `cceac68ea1d0ad198ef4b7b906cd238375836387`; user manifests reject branch names such as `main`. Proposed v2 behavior is isolated in `compat/upstream-v2.experimental.json` and is not a production pin.
+This package does not track an upstream branch at runtime. The production line is pinned to reviewed upstream commit `cceac68ea1d0ad198ef4b7b906cd238375836387`; user manifests reject branch names such as `main`. Upstream v2.1.0 identity and policy are isolated in `compat/upstream-v2.experimental.json` and are not a production pin.
 
 ## What is solved
 
@@ -12,7 +12,7 @@ This package does not track an upstream branch at runtime. The 1.0.x line is pin
 | Missing local package | Complete npm package, lockfile, schema, CLI, MCP server, adapters, tests, and CI |
 | Cross-runtime mismatch | Canonical IR, capability matrix, and emitted downgrade records |
 | SDK import drift | TypeScript MCP SDK pinned exactly to `1.30.0`; no Python `RequestContext` or `ToolResult` imports |
-| Unsafe config replacement | Atomic same-directory writes, parse-before-commit, one-time backup, rollback, JSONC comment preservation, and idempotent merge API |
+| Unsafe config or asset replacement | Preflight collision and symlink-escape rejection, atomic config writes, receipt SHA-256 ownership, modified-file preservation, rollback, JSONC comment preservation, and idempotent merge API |
 | Divergent versions | `src/version.ts` reads the npm package version and defines schema/IR/adapter/migration versions together |
 | Vendor-specific models | Symbolic `reasoning`, `balanced`, and `fast` tiers in the canonical schema |
 | Global config risk | Project scope is default; global installation requires both `--global --allow-global` |
@@ -56,10 +56,13 @@ Install into a project-scoped runtime config, verify it, and retain a rollback p
 node dist/cli.js install harness.manifest.json --runtime codex --project . --config .codex/config.toml
 node dist/cli.js verify --project .
 node dist/cli.js rollback --project .
+node dist/cli.js recover --project .
 node dist/cli.js uninstall --project .
 ```
 
-The receipt is `.harness-re-harness/install.json`. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
+The receipt is `.harness-re-harness/install.json`. Receipt schema 2 records a SHA-256 ownership hash for every generated asset. Before any configuration mutation, installation writes `.harness-re-harness/transaction.json`; after a process or host interruption, `recover` restores the original configuration and removes only hash-owned assets. If a file changed after the interruption, recovery preserves it and retains the journal and backup for manual resolution. Installation refuses an existing receipt or journal, any generated-file collision, stale configuration backups, path escapes through symlinks, and `--replace`. Uninstall removes only generated files whose current hashes still match the receipt and reports modified files as preserved. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
+
+Installed MCP descriptors contain the host's absolute Node executable and package entry path. Regenerate them on each destination host; do not copy an installed descriptor between machines.
 
 ## MCP server
 
@@ -108,7 +111,7 @@ The canonical IR supports `workflow-orchestration`, `persistent-collaboration`, 
 
 ## Version and upstream policy
 
-- Package: `1.0.0`
+- Package: `1.2.0`
 - Canonical schema: `1.0.0`
 - IR: `1.0.0`
 - Adapter contract: `1.0.0`
@@ -126,6 +129,9 @@ The production distribution is pinned to `cceac68ea1d0ad198ef4b7b906cd2383758363
 - generation for all eight runtimes;
 - JSON/JSONC/TOML/YAML transactional merge tests;
 - backup, rollback, idempotency, and failed-write preservation tests;
+- zero-mutation collision/reinstall rejection, symlink-escape rejection, receipt ownership hashes, and modified-asset preservation;
+- separate-process hard-kill recovery after backup, config replacement, asset creation, and receipt creation;
+- exact installed-command startup for all eight adapter formats from an unrelated working directory;
 - MCP initialization and capability discovery;
 - successful and structured-error tool calls;
 - concurrent calls and abort propagation;
@@ -146,3 +152,4 @@ CI repeats this on Node 20, 22, and 24.
 6. Commit the SHA, imported paths, compatibility notes, and lockfile together.
 
 The documented Claude marketplace command remains `/plugin install harness@harness-marketplace`, but it is optional and separate from this distribution. No installer guesses or rewrites marketplace identifiers.
+

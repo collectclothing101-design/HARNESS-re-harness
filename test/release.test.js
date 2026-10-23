@@ -12,3 +12,4 @@ test('all release metadata agrees with the version authority', async () => {
   const report = await validateVersionAuthority(process.cwd());
   assert.equal(report.ok, true, JSON.stringify(report));
 });
+
