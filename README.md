@@ -146,3 +146,7 @@ CI repeats this on Node 20, 22, and 24.
 6. Commit the SHA, imported paths, compatibility notes, and lockfile together.
 
 The documented Claude marketplace command remains `/plugin install harness@harness-marketplace`, but it is optional and separate from this distribution. No installer guesses or rewrites marketplace identifiers.
+
+—--
+
+[![M8ven Score](https://m8ven.ai/badge/mcp/collectclothing101-design-harness-re-harness-8msky2)](https://m8ven.ai/mcp/collectclothing101-design-harness-re-harness-8msky2?s=readme)
