@@ -116,7 +116,10 @@ export async function verifyOperational(record: OperationalReceipt, timeoutMs: n
     try {
       const invalid = await bounded(client.callTool({ name: 'harness_validate', arguments: {} }), timeoutMs, 'invalid tool call');
       invalidInputRejected = invalid.isError === true;
-    } catch { invalidInputRejected = true; }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('timed out after')) throw error;
+      invalidInputRejected = true;
+    }
     const server = client.getServerVersion();
     if (!server) throw new Error('MCP server omitted server identity');
     const tools = toolResult.tools.map(tool => tool.name);
