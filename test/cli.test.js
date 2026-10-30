@@ -12,7 +12,7 @@ import { parse as parseToml } from 'smol-toml';
 import { parse as parseYaml } from 'yaml';
 
 const valid = {
-  schemaVersion: '1.0.0', packageVersion: '1.2.0', name: 'cli-demo',
+  schemaVersion: '1.0.0', packageVersion: '1.3.0', name: 'cli-demo',
   upstream: { repository: 'https://github.com/revfactory/harness', commit: '0123456789abcdef0123456789abcdef01234567' },
   agents: [{ id: 'builder', role: 'implementation', modelTier: 'balanced', skills: ['coding'], tools: ['filesystem'] }],
   skills: [{ id: 'coding', description: 'Implement code', triggers: ['implement'] }],
@@ -73,6 +73,45 @@ test('CLI transactionally installs, verifies, rolls back, and uninstalls a runti
   assert.equal(await readFile(config, 'utf8'), 'theme = "dark"\n');
   assert.equal(cli(['uninstall', '--project', dir], dir).status, 0);
   await assert.rejects(access(join(dir, '.harness-re-harness/install.json')));
+});
+
+test('operational verify starts the installed descriptor and probes the MCP contract', async () => {
+  for (const runtime of ['claude','codex','chatgpt','mimo','opencode','hermes','frank','generic']) {
+    const dir = await mkdtemp(join(tmpdir(), `hrh-operational-${runtime}-`));
+    const input = join(dir, 'harness.manifest.json');
+    await writeFile(input, JSON.stringify(valid));
+    const installed = cli(['install', input, '--runtime', runtime, '--project', dir], dir);
+    assert.equal(installed.status, 0, `${runtime}: ${installed.stderr}`);
+
+    const verified = cli(['verify', '--project', dir, '--operational', '--timeout-ms', '5000'], dir);
+    assert.equal(verified.status, 0, `${runtime}: ${verified.stderr}`);
+    const report = JSON.parse(verified.stdout);
+    assert.equal(report.ok, true, runtime);
+    assert.equal(report.operational.ok, true, runtime);
+    assert.equal(report.operational.server.name, 'harness-re-harness', runtime);
+    assert.ok(report.operational.tools.includes('harness_validate'), runtime);
+    assert.ok(report.operational.resources.includes('harness://capabilities'), runtime);
+    assert.ok(report.operational.prompts.includes('harness_plan'), runtime);
+    assert.equal(report.operational.validCall, true, runtime);
+    assert.equal(report.operational.invalidInputRejected, true, runtime);
+    assert.equal(report.operational.shutdown, true, runtime);
+  }
+});
+
+test('operational verify refuses a descriptor command that differs from the installed package', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hrh-operational-tamper-'));
+  const input = join(dir, 'harness.manifest.json');
+  await writeFile(input, JSON.stringify(valid));
+  const installed = cli(['install', input, '--runtime', 'codex', '--project', dir], dir);
+  assert.equal(installed.status, 0, installed.stderr);
+  const descriptor = JSON.parse(installed.stdout);
+  const config = await readFile(descriptor.config, 'utf8');
+  await writeFile(descriptor.config, config.replace(/^command = .*$/m, 'command = "/definitely/not-harness"'));
+
+  assert.equal(cli(['verify', '--project', dir], dir).status, 0);
+  const verified = cli(['verify', '--project', dir, '--operational'], dir);
+  assert.notEqual(verified.status, 0);
+  assert.match(verified.stderr, /descriptor.*does not match/i);
 });
 
 test('installed MCP launch descriptors start for every runtime from an unrelated working directory', async () => {

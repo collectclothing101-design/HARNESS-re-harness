@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 — 2026-10-30
+
+- Add opt-in `verify --operational` for all eight runtime configuration formats.
+- Refuse to execute a configured descriptor unless its command and arguments match the current installed package.
+- Probe MCP initialization, tools/resources/prompts discovery, one valid call, and one rejected invalid-input call.
+- Enforce bounded initialization, discovery, calls, and shutdown; confirm the spawned server PID exits.
+- Run operational verification from an unrelated temporary working directory.
+- Preserve the README badge added to `master` after the 1.2.0 candidate branch was created.
+
 ## 1.2.0 — 2026-10-23
 
 - Write a complete install transaction journal before configuration mutation.

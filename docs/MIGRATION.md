@@ -1,5 +1,11 @@
 # Migration from Python compatibility patches
 
+## Upgrade from 1.2.0 to 1.3.0
+
+The canonical schema, IR, adapter contract, migration number, receipt schema, and journal schema remain unchanged. Update the manifest's `packageVersion` to `1.3.0`, validate it, and run the acceptance suite.
+
+Version 1.3.0 adds an opt-in operational verification mode. Run structural verification first, then execute `node dist/cli.js verify --project <root> --operational --timeout-ms 5000` on the destination host. The command fails closed if the configured executable or arguments differ from the current package; regenerate descriptors after moving the package or changing Node installations.
+
 ## Upgrade from 1.1.0 to 1.2.0
 
 The canonical schema, IR, adapter contract, migration number, and receipt schema remain unchanged. Update the manifest's `packageVersion` to `1.2.0`, then validate it and run the acceptance suite.

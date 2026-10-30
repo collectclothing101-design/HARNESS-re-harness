@@ -55,12 +55,15 @@ Install into a project-scoped runtime config, verify it, and retain a rollback p
 ```sh
 node dist/cli.js install harness.manifest.json --runtime codex --project . --config .codex/config.toml
 node dist/cli.js verify --project .
+node dist/cli.js verify --project . --operational --timeout-ms 5000
 node dist/cli.js rollback --project .
 node dist/cli.js recover --project .
 node dist/cli.js uninstall --project .
 ```
 
 The receipt is `.harness-re-harness/install.json`. Receipt schema 2 records a SHA-256 ownership hash for every generated asset. Before any configuration mutation, installation writes `.harness-re-harness/transaction.json`; after a process or host interruption, `recover` restores the original configuration and removes only hash-owned assets. If a file changed after the interruption, recovery preserves it and retains the journal and backup for manual resolution. Installation refuses an existing receipt or journal, any generated-file collision, stale configuration backups, path escapes through symlinks, and `--replace`. Uninstall removes only generated files whose current hashes still match the receipt and reports modified files as preserved. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
+
+Structural `verify` performs receipt, version, existence, and ownership-hash checks without executing a command. Opt-in `verify --operational` additionally requires the configured MCP command and arguments to exactly match the current package, launches that descriptor from an unrelated temporary directory, performs initialization and discovery, checks valid and invalid tool calls, and confirms bounded process shutdown. `--timeout-ms` accepts 100–30000 milliseconds and defaults to 5000.
 
 Installed MCP descriptors contain the host's absolute Node executable and package entry path. Regenerate them on each destination host; do not copy an installed descriptor between machines.
 
@@ -111,7 +114,7 @@ The canonical IR supports `workflow-orchestration`, `persistent-collaboration`, 
 
 ## Version and upstream policy
 
-- Package: `1.2.0`
+- Package: `1.3.0`
 - Canonical schema: `1.0.0`
 - IR: `1.0.0`
 - Adapter contract: `1.0.0`
@@ -152,4 +155,8 @@ CI repeats this on Node 20, 22, and 24.
 6. Commit the SHA, imported paths, compatibility notes, and lockfile together.
 
 The documented Claude marketplace command remains `/plugin install harness@harness-marketplace`, but it is optional and separate from this distribution. No installer guesses or rewrites marketplace identifiers.
+
+—--
+
+[![M8ven Score](https://m8ven.ai/badge/mcp/collectclothing101-design-harness-re-harness-8msky2)](https://m8ven.ai/mcp/collectclothing101-design-harness-re-harness-8msky2?s=readme)
 

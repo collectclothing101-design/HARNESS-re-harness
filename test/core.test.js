@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { validateManifest, compileRuntime, VERSION } from '../dist/index.js';
 
 const manifest = {
-  schemaVersion: '1.0.0', packageVersion: '1.2.0', name: 'demo',
+  schemaVersion: '1.0.0', packageVersion: '1.3.0', name: 'demo',
   upstream: { repository: 'https://github.com/revfactory/harness', commit: '0123456789abcdef0123456789abcdef01234567' },
   agents: [{ id: 'builder', role: 'implementation', modelTier: 'balanced', skills: ['coding'], tools: ['filesystem'] }],
   skills: [{ id: 'coding', description: 'Implement code', triggers: ['implement'] }],
@@ -12,7 +12,7 @@ const manifest = {
 };
 
 test('single version authority matches package', () => {
-  assert.equal(VERSION.package, '1.2.0');
+  assert.equal(VERSION.package, '1.3.0');
   assert.equal(VERSION.schema, manifest.schemaVersion);
 });
 

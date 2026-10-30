@@ -8,6 +8,7 @@ import process from 'node:process';
 import { compileRuntime, runtimeConfig } from './compiler.js';
 import { renderMergedConfig, TransactionalConfig } from './config.js';
 import { validateManifest, type Runtime } from './model.js';
+import { verifyOperational } from './operational.js';
 import { validateVersionAuthority } from './release.js';
 import { VERSION } from './version.js';
 
@@ -187,8 +188,16 @@ async function main(args: string[]): Promise<void> {
       if (hash !== undefined && (!file.sha256 || hash !== file.sha256)) modified.push(file.path);
     }
     const configText = await readFile(record.config, 'utf8').catch(() => '');
-    const ok = record.receiptVersion === 2 && record.version === VERSION.package && missing.length === 0 && modified.length === 0 && /harness/i.test(configText);
-    process.stdout.write(`${JSON.stringify({ ok, receiptVersion: record.receiptVersion ?? null, version: record.version, runtime: record.runtime, missing, modified })}\n`);
+    const structuralOk = record.receiptVersion === 2 && record.version === VERSION.package && missing.length === 0 && modified.length === 0 && /harness/i.test(configText);
+    let operational;
+    if (args.includes('--operational') && structuralOk) {
+      const rawTimeout = option(args, '--timeout-ms');
+      const timeoutMs = rawTimeout === undefined ? 5000 : Number(rawTimeout);
+      if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30000) fail('--timeout-ms must be an integer from 100 to 30000');
+      operational = await verifyOperational(record, timeoutMs);
+    }
+    const ok = structuralOk && (operational?.ok ?? true);
+    process.stdout.write(`${JSON.stringify({ ok, receiptVersion: record.receiptVersion ?? null, version: record.version, runtime: record.runtime, missing, modified, ...(operational ? { operational } : {}) })}\n`);
     if (!ok) process.exitCode = 1;
     return;
   }
