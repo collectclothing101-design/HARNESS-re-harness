@@ -1,6 +1,6 @@
 {
   "name": "harness-re-harness",
-  "packageVersion": "1.3.0",
+  "packageVersion": "1.4.0",
   "schemaVersion": "1.0.0",
   "irVersion": "1.0.0",
   "adapterVersion": "1.0.0",
@@ -10,7 +10,7 @@
     "commit": "cceac68ea1d0ad198ef4b7b906cd238375836387",
     "policy": "The production compatibility line remains pinned to this reviewed immutable v1 commit. Upstream v2.1.0 is tracked separately until its imports, license provenance, and cross-runtime behavior pass acceptance."
   },
-  "mcpSdk": "1.30.0",
+  "mcpSdk": "1.32.2",
   "supportedRuntimes": ["claude", "codex", "chatgpt", "mimo", "opencode", "hermes", "frank", "generic"]
 }
 

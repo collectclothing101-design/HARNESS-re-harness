@@ -88,6 +88,9 @@ export type OperationalReport = {
   prompts: string[];
   validCall: boolean;
   invalidInputRejected: boolean;
+  cancellation: boolean;
+  cancelledTaskTerminated: boolean;
+  postCancellationResponsive: boolean;
   shutdown: boolean;
 };
 
@@ -120,17 +123,56 @@ export async function verifyOperational(record: OperationalReceipt, timeoutMs: n
       if (error instanceof Error && error.message.includes('timed out after')) throw error;
       invalidInputRejected = true;
     }
+    const controller = new AbortController();
+    const abortDelay = Math.max(10, Math.min(50, Math.floor(timeoutMs / 4)));
+    const cancellationTimer = setTimeout(() => controller.abort(), abortDelay);
+    let cancellation = false;
+    try {
+      const cancelled = await bounded(
+        client.callTool({ name: 'harness_wait', arguments: { milliseconds: 5000 } }, undefined, { signal: controller.signal }),
+        timeoutMs,
+        'cancellation probe'
+      );
+      cancellation = cancelled.isError === true;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('timed out after')) throw error;
+      if (!(error instanceof Error) || !/abort/i.test(error.message)) throw error;
+      cancellation = true;
+    } finally {
+      clearTimeout(cancellationTimer);
+    }
+    const statusResult = await bounded(
+      client.callTool({ name: 'harness_status', arguments: {} }),
+      timeoutMs,
+      'cancelled-task status probe'
+    );
+    const statusRecord = object(statusResult, 'cancelled-task status result');
+    const statusItems = statusRecord.content;
+    if (!Array.isArray(statusItems)) throw new Error('cancelled-task status result must contain content');
+    const statusContent = statusItems.find(item => item && typeof item === 'object' && !Array.isArray(item) && (item as Record<string, unknown>).type === 'text');
+    const statusText = statusContent && typeof (statusContent as Record<string, unknown>).text === 'string'
+      ? (statusContent as Record<string, unknown>).text as string
+      : undefined;
+    if (!statusText) throw new Error('cancelled-task status result omitted text content');
+    const status = object(JSON.parse(statusText), 'cancelled-task status');
+    const cancelledTaskTerminated = status.activeWaits === 0;
+    const postCancellation = await bounded(
+      client.callTool({ name: 'harness_wait', arguments: { milliseconds: 0 } }),
+      timeoutMs,
+      'post-cancellation liveness probe'
+    );
+    const postCancellationResponsive = postCancellation.isError !== true;
     const server = client.getServerVersion();
     if (!server) throw new Error('MCP server omitted server identity');
     const tools = toolResult.tools.map(tool => tool.name);
     const resources = resourceResult.resources.map(resource => resource.uri);
     const prompts = promptResult.prompts.map(prompt => prompt.name);
     const validCall = valid.isError !== true;
-    const ok = tools.includes('harness_validate') && resources.includes('harness://capabilities') && prompts.includes('harness_plan') && validCall && invalidInputRejected;
+    const ok = tools.includes('harness_validate') && tools.includes('harness_status') && resources.includes('harness://capabilities') && prompts.includes('harness_plan') && validCall && invalidInputRejected && cancellation && cancelledTaskTerminated && postCancellationResponsive;
     await bounded(client.close(), timeoutMs, 'MCP shutdown');
     if (pid !== null) await waitForExit(pid, timeoutMs);
     shutdown = true;
-    return { ok, server, tools, resources, prompts, validCall, invalidInputRejected, shutdown };
+    return { ok, server, tools, resources, prompts, validCall, invalidInputRejected, cancellation, cancelledTaskTerminated, postCancellationResponsive, shutdown };
   } finally {
     if (!shutdown) await transport.close().catch(() => undefined);
     await rm(cwd, { recursive: true, force: true });

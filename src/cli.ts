@@ -233,7 +233,7 @@ async function main(args: string[]): Promise<void> {
     const checks = [
       { name: 'node', ok: Number(process.versions.node.split('.')[0]) >= 20, detail: process.versions.node },
       { name: 'version-authority', ...(await validateVersionAuthority(resolve(option(args, '--root') ?? packageRoot)).then(report => ({ ok: report.ok, detail: report }))) },
-      { name: 'mcp-sdk', ok: await access(resolve(dirname(fileURLToPath(import.meta.url)), '../node_modules/@modelcontextprotocol/sdk')).then(() => true).catch(() => false), detail: 'pinned 1.30.0' }
+      { name: 'mcp-sdk', ok: await access(resolve(dirname(fileURLToPath(import.meta.url)), '../node_modules/@modelcontextprotocol/sdk')).then(() => true).catch(() => false), detail: 'pinned 1.32.2' }
     ];
     const report = { ok: checks.every(x => x.ok), checks };
     process.stdout.write(args.includes('--json') ? `${JSON.stringify(report)}\n` : `${JSON.stringify(report, null, 2)}\n`);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 — 2026-11-06
+
+- Extend operational verification with a real cancellation request over the installed stdio descriptor.
+- Require the cancelled long-running call to reject before its timeout.
+- Add `harness_status` task accounting, require the cancelled task count to return to zero, and probe server responsiveness immediately afterward.
+- Keep external worker-process termination outside the claimed support boundary because this server does not spawn task workers.
+- Refresh the exact MCP SDK, TOML, YAML, and Zod runtime pins and their transitive lockfile; the production dependency audit reports zero known vulnerabilities.
+
 ## 1.3.0 — 2026-10-30
 
 - Add opt-in `verify --operational` for all eight runtime configuration formats.

@@ -1,5 +1,13 @@
 # Migration from Python compatibility patches
 
+## Upgrade from 1.3.0 to 1.4.0
+
+The canonical schema, IR, adapter contract, migration number, receipt schema, and journal schema remain unchanged. Update the manifest's `packageVersion` to `1.4.0`, validate it, and run the acceptance suite.
+
+Version 1.4.0 extends opt-in operational verification with cancellation over the installed stdio descriptor. The report now includes `cancellation`, `cancelledTaskTerminated`, and `postCancellationResponsive`; all must be true. The new `harness_status` tool proves the in-process cancellation-aware task count returns to zero before the liveness probe. It does not claim termination of an external worker process because HARNESS-re-harness does not currently spawn task workers.
+
+Runtime dependencies are refreshed to `@modelcontextprotocol/sdk` 1.32.2, `smol-toml` 1.9.1, `yaml` 2.9.1, and `zod` 4.6.7. Recreate installations with `npm ci --ignore-scripts`; do not reuse a 1.3.0 `node_modules` tree.
+
 ## Upgrade from 1.2.0 to 1.3.0
 
 The canonical schema, IR, adapter contract, migration number, receipt schema, and journal schema remain unchanged. Update the manifest's `packageVersion` to `1.3.0`, validate it, and run the acceptance suite.
