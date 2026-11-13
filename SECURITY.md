@@ -8,3 +8,4 @@
 - Dependency versions and integrity hashes are locked by `package-lock.json`.
 
 Report dependency or configuration-boundary vulnerabilities privately to the package maintainer. Do not include credentials or unsanitized configuration files in reports.
+

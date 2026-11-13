@@ -44,3 +44,4 @@ test('MCP works over a spawned stdio process with clean protocol framing', async
   assert.notEqual(result.isError, true);
   await client.close();
 });
+

@@ -7,6 +7,7 @@ import { VERSION } from './version.js';
 
 export function createHarnessServer(): McpServer {
   const server = new McpServer({ name: 'harness-re-harness', version: VERSION.package });
+  let activeWaits = 0;
   server.registerTool('harness_validate', { description: 'Validate a canonical Harness manifest', inputSchema: { manifest: z.unknown() } }, ({ manifest }) => {
     try { const value = validateManifest(manifest); return { content: [{ type: 'text', text: JSON.stringify({ valid: true, name: value.name }) }] }; }
     catch (error) { return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }] }; }
@@ -16,13 +17,29 @@ export function createHarnessServer(): McpServer {
     catch (error) { return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }] }; }
   });
   server.registerTool('harness_wait', { description: 'Cancellation-aware concurrency probe', inputSchema: { milliseconds: z.number().int().min(0).max(5000) } }, async ({ milliseconds }, extra) => {
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, milliseconds);
-      const abort = () => { clearTimeout(timer); reject(new Error('request aborted')); };
-      if (extra.signal.aborted) abort(); else extra.signal.addEventListener('abort', abort, { once: true });
-    });
-    return { content: [{ type: 'text', text: JSON.stringify({ waited: milliseconds }) }] };
+    activeWaits += 1;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          extra.signal.removeEventListener('abort', abort);
+          if (error) reject(error); else resolve();
+        };
+        const timer = setTimeout(() => finish(), milliseconds);
+        const abort = () => finish(new Error('request aborted'));
+        if (extra.signal.aborted) abort(); else extra.signal.addEventListener('abort', abort, { once: true });
+      });
+      return { content: [{ type: 'text', text: JSON.stringify({ waited: milliseconds }) }] };
+    } finally {
+      activeWaits -= 1;
+    }
   });
+  server.registerTool('harness_status', { description: 'Report operational task state', inputSchema: {} }, () => ({
+    content: [{ type: 'text', text: JSON.stringify({ activeWaits }) }]
+  }));
   server.registerResource('capabilities', 'harness://capabilities', { title: 'Runtime capability matrix', mimeType: 'application/json' }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(capabilityMatrix()) }] }));
   server.registerPrompt('harness_plan', { description: 'Plan a portable Harness workflow', argsSchema: { goal: z.string() } }, ({ goal }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Design a runtime-neutral Harness workflow for: ${goal}` } }] }));
   return server;
@@ -31,3 +48,4 @@ export function createHarnessServer(): McpServer {
 export async function runStdioServer(): Promise<void> {
   await createHarnessServer().connect(new StdioServerTransport());
 }
+
