@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-11-13
+
+- Add `protocol-check` to exercise every protocol revision supported by the pinned MCP SDK over separate real stdio processes.
+- Require initialization, exact supported-version negotiation, tool discovery, bounded shutdown, and no surviving process for each revision.
+- Record the latest-version counteroffer produced for an unsupported revision instead of silently treating it as accepted.
+- Enforce the production dependency audit in every Node 20/22/24 CI matrix job.
+- Keep MCP SDK v2 and its modern 2026 protocol era as an explicit migration target rather than an unreviewed in-place dependency replacement.
+
 ## 1.4.0 — 2026-11-06
 
 - Extend operational verification with a real cancellation request over the installed stdio descriptor.

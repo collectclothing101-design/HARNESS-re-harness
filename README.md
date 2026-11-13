@@ -16,7 +16,7 @@ This package does not track an upstream branch at runtime. The production line i
 | Divergent versions | `src/version.ts` reads the npm package version and defines schema/IR/adapter/migration versions together |
 | Vendor-specific models | Symbolic `reasoning`, `balanced`, and `fast` tiers in the canonical schema |
 | Global config risk | Project scope is default; global installation requires both `--global --allow-global` |
-| Weak MCP validation | Real client/server tests for negotiation, discovery, calls, errors, concurrency, cancellation, and shutdown |
+| Weak MCP validation | Real client/server tests for version negotiation, discovery, calls, errors, concurrency, cancellation, and shutdown |
 | Marker-only installer | Runtime-aware transactional `install`, `verify`, `rollback`, and `uninstall` commands with receipts |
 | Config-only adapters | Runtime-local agent, skill, workflow, canonical-manifest, model-map, and configuration assets |
 | Missing orchestration | Topological execution, persisted state, bounded retry, review gates, and artifact records |
@@ -26,6 +26,7 @@ This package does not track an upstream branch at runtime. The production line i
 ```sh
 npm ci
 npm run acceptance
+node dist/cli.js protocol-check --timeout-ms 5000
 node dist/cli.js doctor --json
 ```
 
@@ -64,6 +65,8 @@ node dist/cli.js uninstall --project .
 The receipt is `.harness-re-harness/install.json`. Receipt schema 2 records a SHA-256 ownership hash for every generated asset. Before any configuration mutation, installation writes `.harness-re-harness/transaction.json`; after a process or host interruption, `recover` restores the original configuration and removes only hash-owned assets. If a file changed after the interruption, recovery preserves it and retains the journal and backup for manual resolution. Installation refuses an existing receipt or journal, any generated-file collision, stale configuration backups, path escapes through symlinks, and `--replace`. Uninstall removes only generated files whose current hashes still match the receipt and reports modified files as preserved. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
 
 Structural `verify` performs receipt, version, existence, and ownership-hash checks without executing a command. Opt-in `verify --operational` additionally requires the configured MCP command and arguments to exactly match the current package, launches that descriptor from an unrelated temporary directory, performs initialization and discovery, checks valid and invalid tool calls, cancels a long-running call over stdio, verifies post-cancellation liveness, and confirms bounded process shutdown. `--timeout-ms` accepts 100–30000 milliseconds and defaults to 5000. Cancellation covers the in-process `harness_wait` tool; external worker-process termination is not claimed because the server does not spawn task workers.
+
+`protocol-check` launches the packaged stdio server separately for every protocol revision supported by the pinned SDK (`2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`, and `2024-10-07`). Each session must negotiate the requested revision, discover `harness_validate`, and exit cleanly. A deliberately unsupported revision must receive the SDK's latest-version counteroffer. This is legacy-era coverage; the MCP TypeScript SDK v2 modern `2026-07-28` era remains a separate migration target.
 
 Installed MCP descriptors contain the host's absolute Node executable and package entry path. Regenerate them on each destination host; do not copy an installed descriptor between machines.
 
@@ -115,7 +118,7 @@ The canonical IR supports `workflow-orchestration`, `persistent-collaboration`, 
 
 ## Version and upstream policy
 
-- Package: `1.4.0`
+- Package: `1.5.0`
 - Canonical schema: `1.0.0`
 - IR: `1.0.0`
 - Adapter contract: `1.0.0`
@@ -137,6 +140,7 @@ The production distribution is pinned to `cceac68ea1d0ad198ef4b7b906cd2383758363
 - separate-process hard-kill recovery after backup, config replacement, asset creation, and receipt creation;
 - exact installed-command startup for all eight adapter formats from an unrelated working directory;
 - MCP initialization and capability discovery;
+- explicit negotiation and discovery for every protocol revision supported by the pinned SDK, plus unsupported-version counteroffer behavior;
 - successful and structured-error tool calls;
 - concurrent calls and abort propagation;
 - spawned-process stdio framing and discovery;
@@ -144,7 +148,7 @@ The production distribution is pinned to `cceac68ea1d0ad198ef4b7b906cd2383758363
 - persisted workflow state, retry, review-gate, and artifact behavior;
 - npm tarball content verification.
 
-CI repeats this on Node 20, 22, and 24.
+CI repeats this on Node 20, 22, and 24 and fails on high-severity production dependency audit findings.
 
 ## Upstream import procedure
 

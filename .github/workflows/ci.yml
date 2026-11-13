@@ -14,4 +14,5 @@ jobs:
         with: { node-version: "${{ matrix.node }}", cache: npm }
       - run: npm ci
       - run: npm run acceptance
+      - run: npm audit --omit=dev --audit-level=high
 

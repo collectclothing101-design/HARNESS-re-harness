@@ -12,7 +12,7 @@ import { parse as parseToml } from 'smol-toml';
 import { parse as parseYaml } from 'yaml';
 
 const valid = {
-  schemaVersion: '1.0.0', packageVersion: '1.4.0', name: 'cli-demo',
+  schemaVersion: '1.0.0', packageVersion: '1.5.0', name: 'cli-demo',
   upstream: { repository: 'https://github.com/revfactory/harness', commit: '0123456789abcdef0123456789abcdef01234567' },
   agents: [{ id: 'builder', role: 'implementation', modelTier: 'balanced', skills: ['coding'], tools: ['filesystem'] }],
   skills: [{ id: 'coding', description: 'Implement code', triggers: ['implement'] }],
@@ -56,6 +56,22 @@ test('CLI rejects global installation unless explicitly opted in', async () => {
   const result = cli(['install', '--global'], dir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /--allow-global/);
+});
+
+test('protocol-check negotiates every supported legacy revision and records the unsupported-version counteroffer', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hrh-protocol-'));
+  const checked = cli(['protocol-check', '--timeout-ms', '5000'], dir);
+  assert.equal(checked.status, 0, checked.stderr);
+  const report = JSON.parse(checked.stdout);
+  assert.equal(report.ok, true);
+  assert.deepEqual(report.supported.map(entry => entry.requested), [
+    '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05', '2024-10-07'
+  ]);
+  assert.ok(report.supported.every(entry => entry.negotiated === entry.requested));
+  assert.ok(report.supported.every(entry => entry.tools.includes('harness_validate')));
+  assert.equal(report.unsupported.requested, '1900-01-01');
+  assert.equal(report.unsupported.negotiated, '2025-11-25');
+  assert.equal(report.shutdown, true);
 });
 
 test('CLI transactionally installs, verifies, rolls back, and uninstalls a runtime', async () => {

@@ -9,6 +9,7 @@ import { compileRuntime, runtimeConfig } from './compiler.js';
 import { renderMergedConfig, TransactionalConfig } from './config.js';
 import { validateManifest, type Runtime } from './model.js';
 import { verifyOperational } from './operational.js';
+import { verifyProtocolMatrix } from './protocol.js';
 import { validateVersionAuthority } from './release.js';
 import { VERSION } from './version.js';
 
@@ -85,7 +86,7 @@ async function main(args: string[]): Promise<void> {
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const command = args[0];
   if (!command || command === 'help' || args.includes('--help')) {
-    process.stdout.write('harness-re-harness <validate|compile|install|recover|verify|rollback|uninstall|doctor|version|version-check|serve> [options]\n'); return;
+    process.stdout.write('harness-re-harness <validate|compile|install|recover|verify|protocol-check|rollback|uninstall|doctor|version|version-check|serve> [options]\n'); return;
   }
   if (command === 'version') { process.stdout.write(`${VERSION.package}\n`); return; }
   if (command === 'serve') { const { runStdioServer } = await import('./server.js'); await runStdioServer(); return; }
@@ -176,6 +177,15 @@ async function main(args: string[]): Promise<void> {
   if (command === 'recover') {
     const root = resolve(option(args, '--project') ?? '.');
     process.stdout.write(`${JSON.stringify(await recoverPending(root))}\n`); return;
+  }
+  if (command === 'protocol-check') {
+    const rawTimeout = option(args, '--timeout-ms');
+    const timeoutMs = rawTimeout === undefined ? 5000 : Number(rawTimeout);
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30000) fail('--timeout-ms must be an integer from 100 to 30000');
+    const report = await verifyProtocolMatrix(timeoutMs);
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    if (!report.ok) process.exitCode = 1;
+    return;
   }
   if (command === 'verify') {
     const root = resolve(option(args, '--project') ?? '.');

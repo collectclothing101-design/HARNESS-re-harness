@@ -1,5 +1,11 @@
 # Migration from Python compatibility patches
 
+## Upgrade from 1.4.0 to 1.5.0
+
+The canonical schema, IR, adapter contract, migration number, receipt schema, journal schema, and runtime dependency pins remain unchanged. Update the manifest's `packageVersion` to `1.5.0`, validate it, and run the acceptance suite.
+
+Version 1.5.0 adds `node dist/cli.js protocol-check --timeout-ms 5000`. Run it after building and before native-host promotion. It exercises the pinned v1 SDK's five supported legacy protocol revisions and the unsupported-version counteroffer path. It does not establish MCP SDK v2 modern-era compatibility.
+
 ## Upgrade from 1.3.0 to 1.4.0
 
 The canonical schema, IR, adapter contract, migration number, receipt schema, and journal schema remain unchanged. Update the manifest's `packageVersion` to `1.4.0`, validate it, and run the acceptance suite.

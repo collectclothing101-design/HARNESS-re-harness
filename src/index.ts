@@ -8,6 +8,8 @@ export type { ConfigFormat } from './config.js';
 export { createHarnessServer, runStdioServer } from './server.js';
 export { validateVersionAuthority } from './release.js';
 export type { VersionAuthorityReport } from './release.js';
+export { verifyProtocolMatrix } from './protocol.js';
+export type { ProtocolMatrixReport, ProtocolProbe } from './protocol.js';
 export { WorkflowRunner } from './orchestrator.js';
 export type { ArtifactRecord, NodeHandler, NodeResult, NodeRunState, RunnerOptions, WorkflowRunState } from './orchestrator.js';
 
