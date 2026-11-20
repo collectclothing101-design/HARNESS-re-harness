@@ -50,3 +50,4 @@ for (const [format, initial] of [['toml', 'theme = "dark"\n'], ['yaml', 'theme: 
     assert.match(output, /dark/);
   });
 }
+

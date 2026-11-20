@@ -33,14 +33,19 @@ function serialize(base: string, format: ConfigFormat, merged: Record<string, un
   return output.endsWith('\n') ? output : `${output}\n`;
 }
 
+export function renderMergedConfig(base: string, format: ConfigFormat, patch: Record<string, unknown>): string {
+  const output = serialize(base, format, deepMerge(parse(base, format), patch), patch);
+  parse(output, format);
+  return output;
+}
+
 export class TransactionalConfig {
-  async merge(path: string, format: ConfigFormat, patch: Record<string, unknown>): Promise<{ changed: boolean; backup: string }> {
+  async merge(path: string, format: ConfigFormat, patch: Record<string, unknown>, afterBackup?: () => void): Promise<{ changed: boolean; backup: string }> {
     const original = await readFile(path, 'utf8');
-    const merged = deepMerge(parse(original, format), patch);
-    const output = serialize(original, format, merged, patch);
-    parse(output, format);
+    const output = renderMergedConfig(original, format, patch);
     const backup = `${path}.hrh-backup`;
     try { await stat(backup); } catch { await copyFile(path, backup); }
+    afterBackup?.();
     if (output === original) return { changed: false, backup };
     const temporary = `${path}.hrh-${process.pid}.tmp`;
     try {
@@ -58,3 +63,4 @@ export class TransactionalConfig {
     await copyFile(backup, path);
   }
 }
+

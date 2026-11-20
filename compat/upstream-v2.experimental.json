@@ -1,7 +1,9 @@
 {
   "status": "experimental-not-production-pinned",
-  "sourcePullRequest": "https://github.com/revfactory/harness/pull/56",
-  "adoptionPolicy": "Adopt only after equivalent changes merge to upstream main, receive a reviewed immutable commit SHA, and pass this distribution's acceptance suite.",
+  "sourceCommit": "928de2c5d233f02c95e68ead22eee034e2ca3d9c",
+  "sourcePullRequest": "https://github.com/revfactory/harness/pull/51",
+  "releasedVersion": "2.1.0",
+  "adoptionPolicy": "The upstream rebuild is merged. Change the production pin only after a file-level import and Apache-2.0 provenance review plus this distribution's full cross-runtime acceptance suite.",
   "executionModes": [
     "workflow-orchestration",
     "persistent-collaboration",
@@ -18,3 +20,4 @@
     "claudeAdapter": { "reasoning": "opus", "balanced": "sonnet", "fast": "sonnet" }
   }
 }
+

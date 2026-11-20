@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+import process from 'node:process';
 import type { Capability, HarnessManifest, Runtime } from './model.js';
 import { validateManifest } from './model.js';
 
@@ -39,6 +41,10 @@ const modelNames: Record<Runtime, Record<ModelMapping['symbolic'], string>> = {
   generic: { reasoning: 'reasoning', balanced: 'balanced', fast: 'fast' }
 };
 
+function serverLaunch(): { command: string; args: string[] } {
+  return { command: process.execPath, args: [fileURLToPath(new URL('./server-entry.js', import.meta.url))] };
+}
+
 export function capabilityMatrix(): Record<Runtime, Capability[]> {
   return Object.fromEntries(Object.entries(support).map(([runtime, values]) => [runtime, [...values]])) as Record<Runtime, Capability[]>;
 }
@@ -55,10 +61,11 @@ export function compileRuntime(input: HarnessManifest, runtime: Runtime): Compil
   }));
   const modelMappings = Object.fromEntries(manifest.agents.map(agent => [agent.id, { symbolic: agent.modelTier, runtime: modelNames[runtime][agent.modelTier] }])) as Record<string, ModelMapping>;
   const payload = { generatedBy: '@frank/harness-re-harness', runtime, manifest, downgrades, modelMappings };
+  const server = serverLaunch();
   const content = runtime === 'codex'
-    ? `[mcp_servers.harness]\ncommand = "node"\nargs = ["dist/server.js"]\n\n[profiles.harness]\nmanifest = "harness.manifest.json"\n`
+    ? `[mcp_servers.harness]\ncommand = ${JSON.stringify(server.command)}\nargs = [${server.args.map(value => JSON.stringify(value)).join(', ')}]\n\n[profiles.harness]\nmanifest = "harness.manifest.json"\n`
     : runtime === 'hermes'
-      ? `mcp_servers:\n  harness:\n    command: node\n    args:\n      - dist/server.js\nharness_manifest: harness.manifest.json\n`
+      ? `mcp_servers:\n  harness:\n    command: ${JSON.stringify(server.command)}\n    args:\n${server.args.map(value => `      - ${JSON.stringify(value)}`).join('\n')}\nharness_manifest: harness.manifest.json\n`
       : `${JSON.stringify(payload, null, 2)}\n`;
   const root = roots[runtime];
   const files: GeneratedFile[] = [
@@ -78,9 +85,10 @@ export function compileRuntime(input: HarnessManifest, runtime: Runtime): Compil
 }
 
 export function runtimeConfig(runtime: Runtime): { path: string; format: 'json' | 'jsonc' | 'toml' | 'yaml'; patch: Record<string, unknown> } {
-  const server = { command: 'node', args: ['dist/server.js'] };
+  const server = serverLaunch();
   if (runtime === 'codex') return { path: paths[runtime], format: 'toml', patch: { mcp_servers: { harness: server }, profiles: { harness: { manifest: '.codex/harness.manifest.json' } } } };
   if (runtime === 'hermes') return { path: paths[runtime], format: 'yaml', patch: { mcp_servers: { harness: server }, harness_manifest: '.hermes/harness.manifest.json' } };
   if (runtime === 'mimo' || runtime === 'opencode') return { path: paths[runtime], format: 'jsonc', patch: { mcp: { harness: server } } };
   return { path: paths[runtime], format: 'json', patch: { mcpServers: { harness: server } } };
 }
+

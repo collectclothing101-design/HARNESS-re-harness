@@ -51,3 +51,4 @@ export type ExecutionMode = z.infer<typeof executionMode>;
 export function validateManifest(input: unknown): HarnessManifest {
   return ManifestSchema.parse(input);
 }
+

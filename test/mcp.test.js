@@ -35,6 +35,43 @@ test('MCP handles concurrent calls and propagates cancellation', async () => {
   await server.close();
 });
 
+test('MCP cancellation terminates a spawned worker process', async () => {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createHarnessServer();
+  const client = new Client({ name: 'worker-cancellation', version: '1.0.0' });
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  const controller = new AbortController();
+  const pending = client.callTool(
+    { name: 'harness_worker', arguments: { milliseconds: 5000 } },
+    undefined,
+    { signal: controller.signal }
+  );
+  let started;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const result = await client.callTool({ name: 'harness_status', arguments: {} });
+    started = JSON.parse(result.content.find(item => item.type === 'text').text);
+    if (started.activeWorkers === 1) break;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.equal(started.activeWorkers, 1);
+  controller.abort();
+  await assert.rejects(pending, /abort/i);
+  let status;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const result = await client.callTool({ name: 'harness_status', arguments: {} });
+    status = JSON.parse(result.content.find(item => item.type === 'text').text);
+    if (status.activeWorkers === 0 && status.lastWorkerExit) break;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.equal(status.activeWorkers, 0);
+  assert.equal(typeof status.lastWorkerPid, 'number');
+  assert.equal(status.lastWorkerExit.pid, status.lastWorkerPid);
+  assert.equal(status.lastWorkerExit.signal, 'SIGKILL');
+  assert.throws(() => process.kill(status.lastWorkerPid, 0), error => error.code === 'ESRCH');
+  await client.close();
+  await server.close();
+});
+
 test('MCP works over a spawned stdio process with clean protocol framing', async () => {
   const transport = new StdioClientTransport({ command: process.execPath, args: ['dist/cli.js', 'serve'], cwd: process.cwd(), stderr: 'pipe' });
   const client = new Client({ name: 'stdio-acceptance', version: '1.0.0' });
@@ -44,3 +81,4 @@ test('MCP works over a spawned stdio process with clean protocol framing', async
   assert.notEqual(result.isError, true);
   await client.close();
 });
+

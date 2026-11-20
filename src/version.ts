@@ -7,3 +7,4 @@ export const VERSION = Object.freeze({
   adapter: '1.0.0',
   migration: 1
 });
+
