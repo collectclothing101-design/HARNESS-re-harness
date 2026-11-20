@@ -4,10 +4,12 @@ import { z } from 'zod';
 import { capabilityMatrix, compileRuntime } from './compiler.js';
 import { validateManifest, type Runtime } from './model.js';
 import { VERSION } from './version.js';
+import { WorkerRegistry } from './worker.js';
 
 export function createHarnessServer(): McpServer {
   const server = new McpServer({ name: 'harness-re-harness', version: VERSION.package });
   let activeWaits = 0;
+  const workers = new WorkerRegistry();
   server.registerTool('harness_validate', { description: 'Validate a canonical Harness manifest', inputSchema: { manifest: z.unknown() } }, ({ manifest }) => {
     try { const value = validateManifest(manifest); return { content: [{ type: 'text', text: JSON.stringify({ valid: true, name: value.name }) }] }; }
     catch (error) { return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }] }; }
@@ -37,8 +39,11 @@ export function createHarnessServer(): McpServer {
       activeWaits -= 1;
     }
   });
+  server.registerTool('harness_worker', { description: 'Spawn a bounded fixed-purpose cancellation probe', inputSchema: { milliseconds: z.number().int().min(100).max(5000) } }, async ({ milliseconds }, extra) => ({
+    content: [{ type: 'text', text: JSON.stringify(await workers.run(milliseconds, extra.signal)) }]
+  }));
   server.registerTool('harness_status', { description: 'Report operational task state', inputSchema: {} }, () => ({
-    content: [{ type: 'text', text: JSON.stringify({ activeWaits }) }]
+    content: [{ type: 'text', text: JSON.stringify({ activeWaits, ...workers.status() }) }]
   }));
   server.registerResource('capabilities', 'harness://capabilities', { title: 'Runtime capability matrix', mimeType: 'application/json' }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(capabilityMatrix()) }] }));
   server.registerPrompt('harness_plan', { description: 'Plan a portable Harness workflow', argsSchema: { goal: z.string() } }, ({ goal }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Design a runtime-neutral Harness workflow for: ${goal}` } }] }));

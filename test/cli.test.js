@@ -12,7 +12,7 @@ import { parse as parseToml } from 'smol-toml';
 import { parse as parseYaml } from 'yaml';
 
 const valid = {
-  schemaVersion: '1.0.0', packageVersion: '1.5.0', name: 'cli-demo',
+  schemaVersion: '1.0.0', packageVersion: '1.6.0', name: 'cli-demo',
   upstream: { repository: 'https://github.com/revfactory/harness', commit: '0123456789abcdef0123456789abcdef01234567' },
   agents: [{ id: 'builder', role: 'implementation', modelTier: 'balanced', skills: ['coding'], tools: ['filesystem'] }],
   skills: [{ id: 'coding', description: 'Implement code', triggers: ['implement'] }],
@@ -112,6 +112,9 @@ test('operational verify starts the installed descriptor and probes the MCP cont
     assert.equal(report.operational.invalidInputRejected, true, runtime);
     assert.equal(report.operational.cancellation, true, runtime);
     assert.equal(report.operational.cancelledTaskTerminated, true, runtime);
+    assert.equal(report.operational.workerCancellation, true, runtime);
+    assert.equal(report.operational.workerTerminated, true, runtime);
+    assert.equal(report.operational.workerExitSignal, 'SIGKILL', runtime);
     assert.equal(report.operational.postCancellationResponsive, true, runtime);
     assert.equal(report.operational.shutdown, true, runtime);
   }

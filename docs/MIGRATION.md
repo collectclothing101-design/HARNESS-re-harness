@@ -1,5 +1,11 @@
 # Migration from Python compatibility patches
 
+## Upgrade from 1.5.0 to 1.6.0
+
+The canonical schema, IR, adapter contract, migration number, receipt schema, journal schema, and runtime dependency pins remain unchanged. Update the manifest's `packageVersion` to `1.6.0`, validate it, and run the acceptance suite.
+
+Version 1.6.0 adds the fixed-purpose `harness_worker` acceptance tool and extends `verify --operational` with child-process cancellation. The report's `workerCancellation` and `workerTerminated` fields must be true and `workerExitSignal` must be `SIGKILL`. The probe accepts only a duration from 100 to 5000 milliseconds and never accepts a command, path, environment, or argument vector.
+
 ## Upgrade from 1.4.0 to 1.5.0
 
 The canonical schema, IR, adapter contract, migration number, receipt schema, journal schema, and runtime dependency pins remain unchanged. Update the manifest's `packageVersion` to `1.5.0`, validate it, and run the acceptance suite.

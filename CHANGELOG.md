@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 — 2026-11-20
+
+- Add a fixed-purpose bounded `harness_worker` probe that cannot execute caller-supplied commands.
+- Require operational verification to observe the worker start, cancel it over MCP, escalate from `SIGTERM` to `SIGKILL`, await its exit, and prove its PID no longer exists.
+- Extend `harness_status` with active-worker accounting and the last worker exit record.
+- Exercise worker termination through the exact installed descriptor for all eight runtime adapter formats.
+
 ## 1.5.0 — 2026-11-13
 
 - Add `protocol-check` to exercise every protocol revision supported by the pinned MCP SDK over separate real stdio processes.

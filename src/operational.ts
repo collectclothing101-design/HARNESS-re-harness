@@ -13,6 +13,7 @@ import type { Runtime } from './model.js';
 type GeneratedReceipt = string | { path: string; sha256: string };
 export type OperationalReceipt = { runtime: Runtime; config: string; generated: GeneratedReceipt[] };
 type ServerDescriptor = { command: string; args: string[] };
+type TaskStatus = { activeWaits: number; activeWorkers: number; lastWorkerPid: number | null; lastWorkerExit: { pid: number; code: number | null; signal: string | null } | null };
 
 function object(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
@@ -80,6 +81,31 @@ async function waitForExit(pid: number, milliseconds: number): Promise<void> {
   }
 }
 
+function toolText(result: unknown, label: string): string {
+  const record = object(result, `${label} result`);
+  if (!Array.isArray(record.content)) throw new Error(`${label} result must contain content`);
+  const item = record.content.find(value => value && typeof value === 'object' && !Array.isArray(value) && (value as Record<string, unknown>).type === 'text');
+  const text = item && typeof (item as Record<string, unknown>).text === 'string' ? (item as Record<string, unknown>).text : undefined;
+  if (!text) throw new Error(`${label} result omitted text content`);
+  return text as string;
+}
+
+function taskStatus(result: unknown, label: string): TaskStatus {
+  return object(JSON.parse(toolText(result, label)), label) as TaskStatus;
+}
+
+async function waitForStatus(client: Client, timeoutMs: number, label: string, predicate: (status: TaskStatus) => boolean): Promise<TaskStatus> {
+  const started = Date.now();
+  while (true) {
+    const remaining = timeoutMs - (Date.now() - started);
+    if (remaining <= 0) throw new Error(`${label} timed out after ${timeoutMs}ms`);
+    const result = await bounded(client.callTool({ name: 'harness_status', arguments: {} }), remaining, label);
+    const status = taskStatus(result, label);
+    if (predicate(status)) return status;
+    await new Promise(resolve => setTimeout(resolve, Math.min(20, remaining)));
+  }
+}
+
 export type OperationalReport = {
   ok: boolean;
   server: { name: string; version: string };
@@ -90,6 +116,9 @@ export type OperationalReport = {
   invalidInputRejected: boolean;
   cancellation: boolean;
   cancelledTaskTerminated: boolean;
+  workerCancellation: boolean;
+  workerTerminated: boolean;
+  workerExitSignal: string | null;
   postCancellationResponsive: boolean;
   shutdown: boolean;
 };
@@ -146,16 +175,24 @@ export async function verifyOperational(record: OperationalReceipt, timeoutMs: n
       timeoutMs,
       'cancelled-task status probe'
     );
-    const statusRecord = object(statusResult, 'cancelled-task status result');
-    const statusItems = statusRecord.content;
-    if (!Array.isArray(statusItems)) throw new Error('cancelled-task status result must contain content');
-    const statusContent = statusItems.find(item => item && typeof item === 'object' && !Array.isArray(item) && (item as Record<string, unknown>).type === 'text');
-    const statusText = statusContent && typeof (statusContent as Record<string, unknown>).text === 'string'
-      ? (statusContent as Record<string, unknown>).text as string
-      : undefined;
-    if (!statusText) throw new Error('cancelled-task status result omitted text content');
-    const status = object(JSON.parse(statusText), 'cancelled-task status');
+    const status = taskStatus(statusResult, 'cancelled-task status');
     const cancelledTaskTerminated = status.activeWaits === 0;
+    const workerController = new AbortController();
+    const workerOutcome = client.callTool(
+      { name: 'harness_worker', arguments: { milliseconds: 5000 } },
+      undefined,
+      { signal: workerController.signal }
+    ).then(result => result.isError === true, error => {
+      if (!(error instanceof Error) || !/abort/i.test(error.message)) throw error;
+      return true;
+    });
+    const workerStarted = await waitForStatus(client, timeoutMs, 'worker startup probe', value => value.activeWorkers === 1 && typeof value.lastWorkerPid === 'number');
+    const workerPid = workerStarted.lastWorkerPid as number;
+    workerController.abort();
+    const workerCancellation = await bounded(workerOutcome, timeoutMs, 'worker cancellation probe');
+    const workerStopped = await waitForStatus(client, timeoutMs, 'worker termination probe', value => value.activeWorkers === 0 && value.lastWorkerExit?.pid === workerPid);
+    const workerTerminated = !running(workerPid);
+    const workerExitSignal = workerStopped.lastWorkerExit?.signal ?? null;
     const postCancellation = await bounded(
       client.callTool({ name: 'harness_wait', arguments: { milliseconds: 0 } }),
       timeoutMs,
@@ -168,11 +205,11 @@ export async function verifyOperational(record: OperationalReceipt, timeoutMs: n
     const resources = resourceResult.resources.map(resource => resource.uri);
     const prompts = promptResult.prompts.map(prompt => prompt.name);
     const validCall = valid.isError !== true;
-    const ok = tools.includes('harness_validate') && tools.includes('harness_status') && resources.includes('harness://capabilities') && prompts.includes('harness_plan') && validCall && invalidInputRejected && cancellation && cancelledTaskTerminated && postCancellationResponsive;
+    const ok = tools.includes('harness_validate') && tools.includes('harness_status') && tools.includes('harness_worker') && resources.includes('harness://capabilities') && prompts.includes('harness_plan') && validCall && invalidInputRejected && cancellation && cancelledTaskTerminated && workerCancellation && workerTerminated && workerExitSignal === 'SIGKILL' && postCancellationResponsive;
     await bounded(client.close(), timeoutMs, 'MCP shutdown');
     if (pid !== null) await waitForExit(pid, timeoutMs);
     shutdown = true;
-    return { ok, server, tools, resources, prompts, validCall, invalidInputRejected, cancellation, cancelledTaskTerminated, postCancellationResponsive, shutdown };
+    return { ok, server, tools, resources, prompts, validCall, invalidInputRejected, cancellation, cancelledTaskTerminated, workerCancellation, workerTerminated, workerExitSignal, postCancellationResponsive, shutdown };
   } finally {
     if (!shutdown) await transport.close().catch(() => undefined);
     await rm(cwd, { recursive: true, force: true });

@@ -64,7 +64,7 @@ node dist/cli.js uninstall --project .
 
 The receipt is `.harness-re-harness/install.json`. Receipt schema 2 records a SHA-256 ownership hash for every generated asset. Before any configuration mutation, installation writes `.harness-re-harness/transaction.json`; after a process or host interruption, `recover` restores the original configuration and removes only hash-owned assets. If a file changed after the interruption, recovery preserves it and retains the journal and backup for manual resolution. Installation refuses an existing receipt or journal, any generated-file collision, stale configuration backups, path escapes through symlinks, and `--replace`. Uninstall removes only generated files whose current hashes still match the receipt and reports modified files as preserved. Global mutation remains disabled unless both `--global` and `--allow-global` are supplied.
 
-Structural `verify` performs receipt, version, existence, and ownership-hash checks without executing a command. Opt-in `verify --operational` additionally requires the configured MCP command and arguments to exactly match the current package, launches that descriptor from an unrelated temporary directory, performs initialization and discovery, checks valid and invalid tool calls, cancels a long-running call over stdio, verifies post-cancellation liveness, and confirms bounded process shutdown. `--timeout-ms` accepts 100–30000 milliseconds and defaults to 5000. Cancellation covers the in-process `harness_wait` tool; external worker-process termination is not claimed because the server does not spawn task workers.
+Structural `verify` performs receipt, version, existence, and ownership-hash checks without executing a command. Opt-in `verify --operational` additionally requires the configured MCP command and arguments to exactly match the current package, launches that descriptor from an unrelated temporary directory, performs initialization and discovery, checks valid and invalid tool calls, cancels both an in-process wait and a fixed-purpose child worker over stdio, verifies that the worker PID exits after bounded `SIGTERM`/`SIGKILL` escalation, probes post-cancellation liveness, and confirms bounded server shutdown. `--timeout-ms` accepts 100–30000 milliseconds and defaults to 5000. The worker accepts only a bounded duration; it cannot execute caller-supplied commands.
 
 `protocol-check` launches the packaged stdio server separately for every protocol revision supported by the pinned SDK (`2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`, and `2024-10-07`). Each session must negotiate the requested revision, discover `harness_validate`, and exit cleanly. A deliberately unsupported revision must receive the SDK's latest-version counteroffer. This is legacy-era coverage; the MCP TypeScript SDK v2 modern `2026-07-28` era remains a separate migration target.
 
@@ -83,7 +83,8 @@ Tools:
 - `harness_validate`: validate the canonical manifest and cross-references.
 - `harness_compile`: generate a runtime-specific result plus downgrade records.
 - `harness_wait`: bounded cancellation/concurrency acceptance probe.
-- `harness_status`: report the number of active cancellation-probe tasks.
+- `harness_worker`: spawn a bounded fixed-purpose child-process cancellation probe.
+- `harness_status`: report active wait/worker counts and the last worker exit record.
 
 Resource: `harness://capabilities`. Prompt: `harness_plan`.
 
@@ -118,7 +119,7 @@ The canonical IR supports `workflow-orchestration`, `persistent-collaboration`, 
 
 ## Version and upstream policy
 
-- Package: `1.5.0`
+- Package: `1.6.0`
 - Canonical schema: `1.0.0`
 - IR: `1.0.0`
 - Adapter contract: `1.0.0`
@@ -143,6 +144,7 @@ The production distribution is pinned to `cceac68ea1d0ad198ef4b7b906cd2383758363
 - explicit negotiation and discovery for every protocol revision supported by the pinned SDK, plus unsupported-version counteroffer behavior;
 - successful and structured-error tool calls;
 - concurrent calls and abort propagation;
+- fixed-purpose child-process cancellation, bounded hard-kill escalation, and PID orphan detection;
 - spawned-process stdio framing and discovery;
 - clean client/server shutdown;
 - persisted workflow state, retry, review-gate, and artifact behavior;
